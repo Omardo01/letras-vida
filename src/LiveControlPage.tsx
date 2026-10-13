@@ -87,6 +87,8 @@ export function LiveControlPage() {
               onShow={live.show}
               onClear={live.clear}
               onOpenOutput={live.openOutput}
+              onLaunch={live.launch}
+              onCloseOutputs={live.closeOutputs}
               onIdentify={live.identify}
               onSwap={live.swap}
               onAssign={live.assign}

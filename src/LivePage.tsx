@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { ensureFont, loadDesign, type Design } from "./lib/design";
-import { loadCalibration, loadLayout, loadOutputName, loadSplit, LocalLive, outputId, saveCalibration, saveOutputName, saveSplit, SPLIT_OPTIONS, splitLabel, tramoAspect, tramoRect, type Calibration, type IdleMode, type LiveLayout, type LiveState, type OutputInfo, type Split } from "./lib/live";
+import { ensureFont, loadDesign, normalizeDesign, type Design } from "./lib/design";
+import { loadCalibration, loadLayout, loadOutputName, loadSplit, LocalLive, monitorLabel, outputId, saveCalibration, saveOutputName, saveSplit, SPLIT_OPTIONS, splitLabel, targetFromUrl, tramoAspect, tramoRect, type Calibration, type IdleMode, type LiveLayout, type LiveState, type OutputInfo, type Split } from "./lib/live";
 import { drawPattern, drawSlide, IN_SECONDS, loadLogo, OUT_SECONDS } from "./lib/render";
 import type { Slide } from "./lib/slides";
 import { builtinUrl, getBackgroundBlob } from "./lib/backgrounds";
+import { findScreen } from "./lib/screens";
+
+/** Monitor asignado por el control al lanzar (null = ventana abierta a mano); fijo mientras viva la ventana. */
+const target = targetFromUrl();
 
 /**
  * Pantalla de salida: ocupa toda la ventana y dibuja lo que mande el control.
@@ -27,13 +31,20 @@ export function LivePage() {
     if (badgeTimer.current) window.clearTimeout(badgeTimer.current);
     badgeTimer.current = window.setTimeout(() => setBadge(null), 5000);
   };
-  const [cal, setCal] = useState<Calibration>(() => loadCalibration(outputId()));
+  const [cal, setCal] = useState<Calibration>(() => loadCalibration(outputId(), target?.key));
   const calRef = useRef(cal);
   calRef.current = cal;
   const [layout, setLayout] = useState<LiveLayout>(loadLayout);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight });
+  const targetScreen = useRef<Screen | null>(null);
+  const [fullscreen, setFullscreen] = useState(() => Boolean(document.fullscreenElement));
+  /** Pantalla completa en su monitor; sin permiso automático solo funciona tras un clic o tecla. */
+  const goFullscreen = () => {
+    const screen = targetScreen.current;
+    return document.documentElement.requestFullscreen?.(screen ? { screen } : undefined);
+  };
   const dpr = () => window.devicePixelRatio || 1;
   const info = (): OutputInfo => ({
     id: idRef.current,
@@ -42,12 +53,14 @@ export function LivePage() {
     width: Math.round(window.innerWidth * dpr()),
     height: Math.round(window.innerHeight * dpr()),
     cal: calRef.current,
+    fullscreen: Boolean(document.fullscreenElement),
+    monitor: target?.key ? monitorLabel(target.key) : undefined,
   });
   /** Ajuste fino de esta salida (llega desde el control en vivo). */
   const calibrate = (next: Calibration) => {
     calRef.current = next;
     setCal(next);
-    saveCalibration(idRef.current, next);
+    saveCalibration(idRef.current, next, target?.key);
     repaintRef.current();
     liveRef.current?.send({ type: "hello", from: "output", output: info() });
   };
@@ -215,7 +228,7 @@ export function LivePage() {
 
     const apply = (state: LiveState) => {
       setStatus("conectado");
-      transition(state.slide, state.design, state.idle ?? "background", state.background ?? null, state.at);
+      transition(state.slide, normalizeDesign(state.design), state.idle ?? "background", state.background ?? null, state.at);
     };
 
     fit();
@@ -248,6 +261,7 @@ export function LivePage() {
         setLayout(m.layout);
         repaintRef.current();
       }
+      if (m.type === "close" && !m.keep.includes(idRef.current)) window.close();
       if (m.type === "swap" && splitRef.current.of > 1) {
         const { part, of } = splitRef.current;
         assign({ part: of - part + 1, of });
@@ -256,7 +270,7 @@ export function LivePage() {
     showBadge();
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "f" || e.key === "F") document.documentElement.requestFullscreen?.();
+      if (e.key === "f" || e.key === "F") goFullscreen()?.catch(() => {});
       if (e.key === "u" || e.key === "U") assign({ part: 1, of: 1 });
       if (e.key === "1" || e.key === "2") assign({ part: parseInt(e.key, 10), of: Math.max(2, splitRef.current.of) });
       if (e.key === "3") assign({ part: 3, of: 3 });
@@ -264,10 +278,31 @@ export function LivePage() {
     };
     window.addEventListener("keydown", onKey);
     const t = window.setTimeout(() => setHint(false), 6000);
+
+    const onFullscreen = () => {
+      setFullscreen(Boolean(document.fullscreenElement));
+      live.send({ type: "hello", from: "output", output: info() });
+    };
+    document.addEventListener("fullscreenchange", onFullscreen);
+
+    // Lanzada por el control: se coloca en su monitor y entra sola a pantalla completa si el navegador lo permite.
+    if (target) {
+      const { left, top } = target;
+      findScreen(left, top).then((screen) => {
+        targetScreen.current = screen;
+        if (screen && (window.screenX < left || window.screenX >= left + screen.width || window.screenY < top || window.screenY >= top + screen.height)) {
+          window.moveTo(left, top);
+          window.resizeTo(screen.width, screen.height);
+        }
+        if (!document.fullscreenElement) goFullscreen()?.catch(() => {});
+      });
+    }
+
     return () => {
       off();
       live.close();
       stopAnim();
+      document.removeEventListener("fullscreenchange", onFullscreen);
       window.removeEventListener("keydown", onKey);
       window.clearTimeout(t);
     };
@@ -279,7 +314,7 @@ export function LivePage() {
   return (
     <div
       className={hint ? "fixed inset-0 bg-black" : "fixed inset-0 cursor-none bg-black"}
-      onClick={() => !gear && document.documentElement.requestFullscreen?.()}
+      onClick={() => !gear && goFullscreen()?.catch(() => {})}
       onMouseMove={showHint}
     >
       {media && !mediaHidden && !layout.pattern && (
@@ -360,6 +395,16 @@ export function LivePage() {
       {hint && (
         <div className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-black/60 px-2 py-1 text-xs text-white/80">
           {name || idRef.current} · {status} · clic o F = pantalla completa
+        </div>
+      )}
+      {target && !fullscreen && !badge && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="rounded-3xl bg-black/80 px-[6vw] py-[4vh] text-center text-white shadow-2xl ring-4 ring-white/30">
+            <div className="text-[14vh] font-bold leading-none">{split.of > 1 ? split.part : "▣"}</div>
+            {name && <div className="mt-2 text-[4.5vh] font-bold">{name}</div>}
+            <div className="mt-2 text-[4.5vh] font-bold">Haz clic aquí para pantalla completa</div>
+            <div className="mt-1 text-[2.4vh] text-white/70">{splitLabel(split)} · o pulsa F</div>
+          </div>
         </div>
       )}
       {badge && (

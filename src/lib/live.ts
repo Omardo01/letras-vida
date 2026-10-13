@@ -37,6 +37,10 @@ export interface OutputInfo extends Split {
   width: number;
   height: number;
   cal: Calibration;
+  /** Está a pantalla completa (si no, falta un clic en esa pantalla). */
+  fullscreen?: boolean;
+  /** Monitor donde la lanzó el control (nombre que da el sistema), si fue así. */
+  monitor?: string;
 }
 
 /**
@@ -135,7 +139,9 @@ export type LiveMessage =
   /** Ajuste fino de la salida `id` (tamaño, proporción, posición). */
   | { type: "calibrate"; id: string; cal: Calibration }
   /** Proporción común y carta de ajuste, para todas las salidas. */
-  | { type: "layout"; layout: LiveLayout };
+  | { type: "layout"; layout: LiveLayout }
+  /** Las salidas que no estén en `keep` se cierran (p. ej. al relanzar con menos pantallas). */
+  | { type: "close"; keep: string[] };
 
 export const SPLIT_OPTIONS: { label: string; split: Split }[] = [
   { label: "Pantalla única", split: { part: 1, of: 1 } },
@@ -169,7 +175,11 @@ export class LocalLive {
   }
 
   send(m: LiveMessage) {
-    this.bc?.postMessage(m);
+    try {
+      this.bc?.postMessage(m);
+    } catch {
+      /* canal ya cerrado (p. ej. una tarea async que terminó después de desmontar) */
+    }
     if (m.type === "state") {
       try {
         localStorage.setItem(LAST_KEY, JSON.stringify(m.state));
@@ -244,18 +254,63 @@ export function loadSplit(id: string): Split {
   return splitFromUrl();
 }
 
-export function saveSplit(id: string, split: Split) {
+/** Recuerda el tramo de una salida (el control lo usa antes de abrirla). */
+export function storeSplit(id: string, split: Split) {
   try {
     localStorage.setItem(`letrasvida.live.split.${id}`, JSON.stringify(split));
   } catch {
     /* ignore */
   }
-  window.history.replaceState(null, "", split.of > 1 ? `?part=${split.part}&of=${split.of}` : window.location.pathname);
 }
 
-export function liveUrl(part?: number, of?: number): string {
-  return of && of > 1 ? `${LIVE_PATH}?part=${part}&of=${of}` : LIVE_PATH;
+export function saveSplit(id: string, split: Split) {
+  storeSplit(id, split);
+  const q = new URLSearchParams(window.location.search);
+  if (split.of > 1) {
+    q.set("part", String(split.part));
+    q.set("of", String(split.of));
+  } else {
+    q.delete("part");
+    q.delete("of");
+  }
+  const qs = q.toString();
+  window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
 }
+
+/** Esquina (coordenadas globales) del monitor donde debe ir una salida. */
+export interface ScreenTarget {
+  left: number;
+  top: number;
+  /** Identidad del monitor (nombre|posición|tamaño): el ajuste fino se guarda con ella. */
+  key?: string;
+}
+
+export function liveUrl(part?: number, of?: number, target?: ScreenTarget): string {
+  const q = new URLSearchParams();
+  if (of && of > 1) {
+    q.set("part", String(part));
+    q.set("of", String(of));
+  }
+  if (target) {
+    q.set("x", String(target.left));
+    q.set("y", String(target.top));
+    if (target.key) q.set("m", target.key);
+  }
+  const qs = q.toString();
+  return qs ? `${LIVE_PATH}?${qs}` : LIVE_PATH;
+}
+
+/** El monitor que el control le asignó a esta salida al lanzarla, si lo hay. */
+export function targetFromUrl(): ScreenTarget | null {
+  const q = new URLSearchParams(window.location.search);
+  const x = q.get("x");
+  const y = q.get("y");
+  if (x == null || y == null || !Number.isFinite(Number(x)) || !Number.isFinite(Number(y))) return null;
+  return { left: Number(x), top: Number(y), key: q.get("m") ?? undefined };
+}
+
+/** Nombre legible del monitor a partir de su identidad. */
+export const monitorLabel = (key: string) => key.split("|")[0];
 
 export function loadOutputName(id: string): string {
   try {
@@ -329,8 +384,26 @@ function saveJson(key: string, value: unknown) {
   }
 }
 
-export const loadCalibration = (id: string) => loadJson(`letrasvida.live.cal.${id}`, DEFAULT_CAL);
-export const saveCalibration = (id: string, cal: Calibration) => saveJson(`letrasvida.live.cal.${id}`, cal);
+const calKey = (id: string, monitor?: string) => (monitor ? `letrasvida.live.cal.monitor:${monitor}` : `letrasvida.live.cal.${id}`);
+
+/**
+ * Ajuste fino de una salida. Si el control la lanzó en un monitor, el ajuste
+ * es de ese monitor (la tele del adaptador conserva el suyo aunque cambie el
+ * orden de las ventanas); si ese monitor aún no tiene, se parte del de la ventana.
+ */
+export function loadCalibration(id: string, monitor?: string): Calibration {
+  if (monitor) {
+    try {
+      const raw = localStorage.getItem(calKey(id, monitor));
+      if (raw) return { ...DEFAULT_CAL, ...(JSON.parse(raw) as Partial<Calibration>) };
+    } catch {
+      /* ignore */
+    }
+  }
+  return loadJson(calKey(id), DEFAULT_CAL);
+}
+
+export const saveCalibration = (id: string, cal: Calibration, monitor?: string) => saveJson(calKey(id, monitor), cal);
 
 const LAYOUT_KEY = "letrasvida.live.layout";
 export const loadLayout = () => loadJson(LAYOUT_KEY, DEFAULT_LAYOUT);

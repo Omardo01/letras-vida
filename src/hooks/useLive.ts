@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Design } from "../lib/design";
-import { liveUrl, loadBackgroundChoice, loadIdle, loadLayout, LocalLive, saveBackgroundChoice, saveIdle, saveLayout, type Calibration, type IdleMode, type LiveLayout, type LiveState, type OutputInfo, type Split } from "../lib/live";
+import { liveUrl, loadBackgroundChoice, loadIdle, loadLayout, LocalLive, saveBackgroundChoice, saveIdle, saveLayout, storeSplit, type Calibration, type IdleMode, type LiveLayout, type LiveState, type OutputInfo, type Split } from "../lib/live";
+import type { PlannedOutput } from "../lib/screens";
 import type { Slide } from "../lib/slides";
 
 /** Lado "control" del modo en vivo: publica slides y sabe si hay una salida escuchando. */
@@ -91,6 +92,25 @@ export function useLive(design: Design) {
     }
   }, []);
 
+  /**
+   * Abre una salida por monitor, ya en su lugar y con su tramo; cada una se
+   * pone sola a pantalla completa en su monitor (o pide un clic si el navegador
+   * no lo permite sin gesto). Las de un lanzamiento anterior que sobren se
+   * cierran. Devuelve cuántas ventanas bloqueó el navegador.
+   */
+  const launch = useCallback((plan: PlannedOutput[]) => {
+    const ids = plan.map((_, i) => `letrasvida-live-${i + 1}`);
+    live.current?.send({ type: "close", keep: ids });
+    let blocked = 0;
+    plan.forEach(({ screen, split }, i) => {
+      storeSplit(ids[i], split);
+      const features = `popup=yes,left=${screen.left},top=${screen.top},width=${screen.width},height=${screen.height}`;
+      if (!window.open(liveUrl(split.part, split.of, screen), ids[i], features)) blocked++;
+    });
+    return blocked;
+  }, []);
+  const closeOutputs = useCallback(() => live.current?.send({ type: "close", keep: [] }), []);
+
   const identify = useCallback((id?: string) => live.current?.send({ type: "identify", id }), []);
   const swap = useCallback(() => live.current?.send({ type: "swap" }), []);
   const assign = useCallback((id: string, split: Split) => live.current?.send({ type: "assign", id, split }), []);
@@ -110,5 +130,5 @@ export function useLive(design: Design) {
     live.current?.send({ type: "layout", layout: next });
   }, []);
 
-  return { layout, setLayout, calibrate, current, connected, outputs, idle, setIdle, background, setBackground, show: publish, clear: () => publish(null), openOutput, identify, swap, assign, rename };
+  return { layout, setLayout, calibrate, current, connected, outputs, idle, setIdle, background, setBackground, show: publish, clear: () => publish(null), openOutput, launch, closeOutputs, identify, swap, assign, rename };
 }

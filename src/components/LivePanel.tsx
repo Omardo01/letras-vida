@@ -3,7 +3,9 @@ import clsx from "clsx";
 import type { ChapterInfo } from "../lib/bible";
 import { ASPECT_OPTIONS, aspectLabel, DEFAULT_CAL, FIT_OPTIONS, IDLE_OPTIONS, SPLIT_OPTIONS, type Calibration, type IdleMode, type LiveLayout, type OutputInfo, type Split } from "../lib/live";
 import { BOOK_BY_ID } from "../lib/books";
+import type { PlannedOutput } from "../lib/screens";
 import type { Slide } from "../lib/slides";
+import { ScreensLauncher } from "./ScreensLauncher";
 
 interface Props {
   connected: boolean;
@@ -14,6 +16,8 @@ interface Props {
   onShow: (slide: Slide) => void;
   onClear: () => void;
   onOpenOutput: (screens?: number) => void;
+  onLaunch: (plan: PlannedOutput[]) => number;
+  onCloseOutputs: () => void;
   onIdentify: (id?: string) => void;
   onSwap: () => void;
   onAssign: (id: string, split: Split) => void;
@@ -26,7 +30,7 @@ interface Props {
   onCalibrate: (id: string, cal: Calibration) => void;
 }
 
-export function LivePanel({ connected, current, resolve, chapterInfo, onShow, onClear, onOpenOutput, onIdentify, onSwap, onAssign, onRename, outputs, idle, onIdle, layout, onLayout, onCalibrate }: Props) {
+export function LivePanel({ connected, current, resolve, chapterInfo, onShow, onClear, onOpenOutput, onLaunch, onCloseOutputs, onIdentify, onSwap, onAssign, onRename, outputs, idle, onIdle, layout, onLayout, onCalibrate }: Props) {
   const [config, setConfig] = useState(false);
   const [tuning, setTuning] = useState<string | null>(null);
   const [text, setText] = useState("");
@@ -138,12 +142,18 @@ export function LivePanel({ connected, current, resolve, chapterInfo, onShow, on
         <button onClick={() => setConfig((v) => !v)} className={clsx("rounded-lg border px-2.5 py-1 font-semibold", config ? "border-accent bg-blue-50 text-accent" : "border-line hover:border-accent/60")}>
           ⚙ Pantallas
         </button>
+        {!connected && !config && (
+          <button onClick={() => setConfig(true)} className="rounded-lg bg-accent px-2.5 py-1 font-semibold text-white hover:brightness-110">
+            Lanzar en pantallas
+          </button>
+        )}
       </div>
 
       {config && (
         <div className="space-y-2 rounded-xl border border-line bg-bg/60 p-3 text-sm">
+          <ScreensLauncher outputs={outputs} layout={layout} onLayout={onLayout} onLaunch={onLaunch} onClose={onCloseOutputs} onIdentify={() => onIdentify()} />
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted">Abrir salida:</span>
+            <span className="text-xs text-muted" title="Ventanas sueltas que llevas tú a cada monitor (para navegadores sin detección de pantallas)">Abrir a mano:</span>
             <button onClick={() => onOpenOutput(1)} className="rounded-lg border border-line bg-panel px-2.5 py-1 text-xs font-semibold hover:border-accent/60">1 pantalla</button>
             <button onClick={() => onOpenOutput(2)} className="rounded-lg border border-line bg-panel px-2.5 py-1 text-xs font-semibold hover:border-accent/60" title="Dos ventanas: izquierda y derecha, una en cada monitor">2 pantallas unidas</button>
             <button onClick={() => onOpenOutput(3)} className="rounded-lg border border-line bg-panel px-2.5 py-1 text-xs font-semibold hover:border-accent/60">3 pantallas unidas</button>
@@ -189,6 +199,7 @@ export function LivePanel({ connected, current, resolve, chapterInfo, onShow, on
                       title={`Nombre de la pantalla (${o.id})`}
                       className="w-40 rounded border border-transparent bg-transparent px-1 py-0.5 font-semibold hover:border-line focus:border-accent focus:outline-none"
                     />
+                    {o.monitor && <span className="font-semibold text-accent" title="Monitor donde se lanzó; su ajuste se guarda con él">{o.monitor}</span>}
                     <span className="text-muted" title="Píxeles reales que recibe esa pantalla">{o.width}×{o.height} · {aspectLabel(o.width, o.height)}</span>
                     <select
                       value={`${o.part}/${o.of}`}
@@ -233,7 +244,7 @@ export function LivePanel({ connected, current, resolve, chapterInfo, onShow, on
               </button>
             ))}
           </div>
-          <p className="text-xs text-muted">Si una pantalla sale más grande, más chica o desfasada (p. ej. por un adaptador DP), muestra la <b>carta de ajuste</b> y usa <b>Ajustar</b> en esa salida hasta que los círculos queden redondos y las líneas sigan rectas en la unión. Lleva cada ventana a su monitor y pulsa <b>F</b>. Cada ventana tiene también un ⚙ abajo a la izquierda (mueve el ratón) para ponerle nombre y elegir su mitad; atajos 1 / 2 / U.</p>
+          <p className="text-xs text-muted">Si una pantalla sale más grande, más chica o desfasada (p. ej. por un adaptador DP), muestra la <b>carta de ajuste</b> y usa <b>Ajustar</b> en esa salida hasta que los círculos queden redondos y las líneas sigan rectas en la unión. Si abriste las ventanas a mano, lleva cada una a su monitor y pulsa <b>F</b>. Cada ventana tiene también un ⚙ abajo a la izquierda (mueve el ratón) para ponerle nombre y elegir su mitad; atajos 1 / 2 / U.</p>
         </div>
       )}
 
