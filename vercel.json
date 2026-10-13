@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/live", "destination": "/index.html" },
+    { "source": "/envivo", "destination": "/index.html" }
+  ]
+}
