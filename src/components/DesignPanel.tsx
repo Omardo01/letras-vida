@@ -1,5 +1,6 @@
 import clsx from "clsx";
-import { DEFAULT_DESIGN, FONTS, PRESETS, type Design } from "../lib/design";
+import { DEFAULT_DESIGN, FONTS, PRESETS, REF_H, type Design } from "../lib/design";
+import { BOX_PAD, BOX_TOP } from "../lib/render";
 
 interface Props {
   design: Design;
@@ -101,13 +102,13 @@ export function DesignPanel({ design, onChange }: Props) {
         </select>
       </label>
 
-      <Range label="Tamaño máximo del texto" value={design.maxFontSize} min={24} max={56} onChange={(v) => set({ maxFontSize: v, minFontSize: Math.min(design.minFontSize, v) })} />
+      <Range label="Tamaño máximo del texto" value={design.maxFontSize} min={24} max={72} onChange={(v) => set({ maxFontSize: v, minFontSize: Math.min(design.minFontSize, v) })} />
       <Range label="Tamaño mínimo (pasajes largos)" value={design.minFontSize} min={14} max={design.maxFontSize} onChange={(v) => set({ minFontSize: v })} />
-      <Range label="Tamaño de los títulos" value={design.titleFontSize} min={30} max={110} onChange={(v) => set({ titleFontSize: v })} />
+      <Range label="Tamaño de los títulos" value={design.titleFontSize} min={30} max={130} onChange={(v) => set({ titleFontSize: v })} />
       <Range label="Tamaño de la cita" value={design.pillFontSize} min={20} max={48} onChange={(v) => set({ pillFontSize: v })} />
       <Range label="Ancho de la caja" value={design.boxWidth} min={1200} max={1960} step={10} onChange={(v) => set({ boxWidth: v })} />
-      <Range label="Ancho del bloque de texto" value={design.textMaxWidth} min={700} max={design.boxWidth - 160} step={10} onChange={(v) => set({ textMaxWidth: v })} />
-      <Range label="Alto de la caja" value={design.boxHeight} min={200} max={380} step={2} onChange={(v) => set({ boxHeight: v })} />
+      <Range label="Ancho del bloque de texto" value={design.textMaxWidth} min={700} max={design.boxWidth - 2 * BOX_PAD} step={10} onChange={(v) => set({ textMaxWidth: v })} />
+      <Range label="Alto de la caja" value={design.boxHeight} min={200} max={REF_H - BOX_TOP - 12} step={2} onChange={(v) => set({ boxHeight: v })} />
       <Range label="Redondeo de la caja" value={design.boxRadius} min={0} max={80} onChange={(v) => set({ boxRadius: v })} />
 
       <div className="space-y-2 rounded-lg border border-line p-3">

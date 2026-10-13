@@ -5,6 +5,12 @@ import type { Slide } from "./slides";
 export const IN_SECONDS = 0.55;
 export const OUT_SECONDS = 0.45;
 
+// ── Geometría fija (unidades de referencia) ──
+/** Borde superior de la caja: justo debajo del logo y la píldora. */
+export const BOX_TOP = 142;
+/** Margen interior mínimo a los lados del texto. */
+export const BOX_PAD = 70;
+
 export interface AnimState {
   /** Segundos desde el inicio del clip. */
   t: number;
@@ -185,21 +191,21 @@ export function drawSlide(
     const w = 186 * S * design.logoScale;
     const h = (w * logo.naturalHeight) / logo.naturalWidth;
     ctx.globalAlpha = logoIn * logoOut;
-    ctx.drawImage(logo, 12 * S + (1 - logoIn) * -30 * S, offY + 18 * S, w, h);
+    ctx.drawImage(logo, 12 * S + (1 - logoIn) * -30 * S, offY + 10 * S, w, h);
     ctx.globalAlpha = 1;
   }
 
   // Píldora
   if (slide.label) {
-    const ph = 66 * S;
+    const ph = 70 * S;
     const scale = 0.9 + 0.1 * pillDrop;
     const dy = (-90 * (1 - pillDrop) - 70 * (1 - pillOut)) * S;
     ctx.save();
     ctx.globalAlpha = clamp01(pillDrop * 1.6) * pillOut;
-    ctx.translate(W / 2, offY + 56 * S + ph / 2 + dy);
+    ctx.translate(W / 2, offY + 34 * S + ph / 2 + dy);
     ctx.scale(scale, scale);
     ctx.font = `700 ${design.pillFontSize * S}px "${design.fontFamily}", sans-serif`;
-    const width = Math.max(488 * S, ctx.measureText(slide.label).width + 90 * S);
+    const width = Math.max(520 * S, ctx.measureText(slide.label).width + 96 * S);
     ctx.fillStyle = design.pillColor;
     roundRect(ctx, -width / 2, -ph / 2, width, ph, ph / 2);
     ctx.fill();
@@ -214,7 +220,7 @@ export function drawSlide(
   const bw = design.boxWidth * S;
   const bh = design.boxHeight * S;
   const bx = (W - bw) / 2;
-  const by = offY + 168 * S;
+  const by = offY + BOX_TOP * S;
   ctx.save();
   ctx.globalAlpha = boxIn * boxOut;
   ctx.translate(bx, by);
@@ -224,7 +230,7 @@ export function drawSlide(
   ctx.fill();
 
   // Texto
-  const pad = 80 * S;
+  const pad = BOX_PAD * S;
   const innerW = Math.min(bw - 2 * pad, design.textMaxWidth * S);
   const { fontSize, lines, lineHeight } = fitText(
     ctx,
@@ -232,7 +238,7 @@ export function drawSlide(
     design,
     S,
     innerW,
-    bh - 60 * S,
+    bh - 56 * S,
     slide.fontSize ?? (slide.kind === "title" ? design.titleFontSize : design.maxFontSize),
   );
   ctx.font = `700 ${fontSize}px "${design.fontFamily}", sans-serif`;

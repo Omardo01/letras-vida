@@ -20,10 +20,20 @@ export interface Design {
   logo: string | null; // dataURL o ruta
   showLogo: boolean;
   logoScale: number;
+  /** Versión de las medidas por defecto con que se guardó (ver LAYOUT_VERSION). */
+  layoutVersion: number;
 }
 
 export const REF_W = 2000;
 export const REF_H = 563;
+
+/**
+ * Sube cuando cambian las medidas por defecto. Un diseño guardado con otra
+ * versión conserva colores, fuente y logo, pero toma las medidas nuevas.
+ * v3: caja y texto más grandes que la referencia original (v2 fue un paso intermedio).
+ */
+export const LAYOUT_VERSION = 3;
+const LAYOUT_KEYS = ["maxFontSize", "minFontSize", "titleFontSize", "pillFontSize", "boxHeight", "boxWidth", "textMaxWidth"] as const;
 
 export const DEFAULT_DESIGN: Design = {
   background: "#ffffff",
@@ -32,17 +42,18 @@ export const DEFAULT_DESIGN: Design = {
   boxColor: "#1178bc",
   textColor: "#ffffff",
   fontFamily: "Open Sans",
-  maxFontSize: 38,
-  minFontSize: 22,
-  titleFontSize: 64,
-  pillFontSize: 34,
+  maxFontSize: 48,
+  minFontSize: 26,
+  titleFontSize: 78,
+  pillFontSize: 38,
   boxRadius: 22,
-  boxHeight: 318,
-  boxWidth: 1739,
-  textMaxWidth: 1250,
+  boxHeight: 388,
+  boxWidth: 1860,
+  textMaxWidth: 1560,
   logo: `${import.meta.env.BASE_URL}logo.png`,
   showLogo: true,
   logoScale: 1,
+  layoutVersion: LAYOUT_VERSION,
 };
 
 /** Diseños predeterminados: cambian colores, fuente y fondo; el logo se conserva. */
@@ -86,10 +97,20 @@ export async function ensureFont(family: string): Promise<void> {
 export const DESIGN_KEY = "versiculos.design.v1";
 const KEY = DESIGN_KEY;
 
+/** Completa un diseño guardado (o recibido en vivo) y lo lleva a las medidas actuales. */
+export function normalizeDesign(saved: Partial<Design>): Design {
+  const d: Design = { ...DEFAULT_DESIGN, ...saved };
+  if (saved.layoutVersion !== LAYOUT_VERSION) {
+    for (const k of LAYOUT_KEYS) d[k] = DEFAULT_DESIGN[k];
+    d.layoutVersion = LAYOUT_VERSION;
+  }
+  return d;
+}
+
 export function loadDesign(): Design {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...DEFAULT_DESIGN, ...(JSON.parse(raw) as Partial<Design>) };
+    if (raw) return normalizeDesign(JSON.parse(raw) as Partial<Design>);
   } catch {
     /* localStorage no disponible */
   }
