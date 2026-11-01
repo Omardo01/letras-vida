@@ -405,6 +405,17 @@ export function loadCalibration(id: string, monitor?: string): Calibration {
 
 export const saveCalibration = (id: string, cal: Calibration, monitor?: string) => saveJson(calKey(id, monitor), cal);
 
+/** El ajuste fino de un monitor pasa a su nueva identidad (Windows lo reacomodó o cambió su resolución). */
+export function moveMonitorCalibration(from: string, to: string) {
+  try {
+    const raw = localStorage.getItem(calKey("", from));
+    if (raw) localStorage.setItem(calKey("", to), raw);
+    else localStorage.removeItem(calKey("", to));
+  } catch {
+    /* ignore */
+  }
+}
+
 const LAYOUT_KEY = "letrasvida.live.layout";
 export const loadLayout = () => loadJson(LAYOUT_KEY, DEFAULT_LAYOUT);
 export const saveLayout = (layout: LiveLayout) => saveJson(LAYOUT_KEY, layout);

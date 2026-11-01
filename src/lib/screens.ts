@@ -149,19 +149,32 @@ export const inPositionOrder = (screens: DetectedScreen[], keys: string[]) => sc
 
 /**
  * La configuración guardada aplicada a los monitores de ahora. Si un monitor
- * cambió de identidad (Windows lo reacomodó al apagar y prender la tele), se
- * busca otro con el mismo nombre y tamaño que no sea el del control.
+ * cambió de identidad (Windows lo reacomodó al apagar y prender la tele, o el
+ * adaptador cambió de resolución), se busca otro que no sea el del control con
+ * el mismo nombre y tamaño, o al menos el mismo nombre. `remap` dice qué
+ * identidad guardada corresponde ahora a qué monitor.
  */
-export function resolvePlan(screens: DetectedScreen[], plan: ScreenPlan): { outputs: PlannedOutput[]; missing: number } {
-  const used = new Set<string>();
-  const keys = plan.selected.map((k) => {
-    const [label, , size] = k.split("|");
-    const s = screens.find((x) => x.key === k && !used.has(x.key)) ?? screens.find((x) => !used.has(x.key) && !x.isCurrent && !plan.selected.includes(x.key) && x.label === label && `${x.width}x${x.height}` === size);
-    if (s) used.add(s.key);
-    return s?.key;
-  });
-  const found = keys.filter((k): k is string => Boolean(k));
-  return { outputs: planOutputs(screens, found, plan.mode), missing: keys.length - found.length };
+export function resolvePlan(screens: DetectedScreen[], plan: ScreenPlan): { outputs: PlannedOutput[]; missing: number; remap: [string, string][] } {
+  const found = plan.selected.map((k) => screens.find((x) => x.key === k));
+  const used = new Set(found.flatMap((s) => (s ? [s.key] : [])));
+  const passes: ((x: DetectedScreen, label: string, size: string) => boolean)[] = [
+    (x, label, size) => x.label === label && `${x.width}x${x.height}` === size,
+    (x, label) => x.label === label,
+  ];
+  for (const same of passes) {
+    plan.selected.forEach((k, i) => {
+      if (found[i]) return;
+      const [label, , size] = k.split("|");
+      const s = screens.find((x) => !used.has(x.key) && !x.isCurrent && !plan.selected.includes(x.key) && same(x, label, size));
+      if (s) {
+        found[i] = s;
+        used.add(s.key);
+      }
+    });
+  }
+  const keys = found.flatMap((s) => (s ? [s.key] : []));
+  const remap = plan.selected.flatMap((k, i): [string, string][] => (found[i] && found[i].key !== k ? [[k, found[i].key]] : []));
+  return { outputs: planOutputs(screens, keys, plan.mode), missing: plan.selected.length - keys.length, remap };
 }
 
 /** Si todos los monitores elegidos tienen la misma proporción, esa; si no, null. */

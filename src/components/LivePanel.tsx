@@ -66,7 +66,7 @@ export function LivePanel({ connected, current, resolve, chapterInfo, onShow, on
       setPowerMsg("Chrome no dio permiso para ver los monitores.");
       return;
     }
-    const { outputs: planned, missing } = resolvePlan(list, plan);
+    const { outputs: planned, missing } = resolvePlan(list, scr.heal(list) ?? plan);
     if (missing || !planned.length) {
       setConfig(true);
       setPowerMsg(`No encuentro ${missing > 1 ? `${missing} de las pantallas configuradas` : "una de las pantallas configuradas"}. Revisa que las teles estén prendidas y que Windows las tenga en «Extender», o vuelve a elegirlas.`);

@@ -79,6 +79,30 @@ describe("resolvePlan", () => {
       [a.key, 1],
       [b.key, 2],
     ]);
+    expect(resolvePlan([laptop, a, b], { selected: saved, mode: "joined" }).remap).toEqual([
+      [saved[0], a.key],
+      [saved[1], b.key],
+    ]);
+  });
+
+  it("sin cambios no hay nada que pasar a otra identidad", () => {
+    const [a, b] = [tv(1512), tv(3432)];
+    expect(resolvePlan([laptop, a, b], { selected: [a.key, b.key], mode: "joined" }).remap).toEqual([]);
+  });
+
+  it("si el adaptador cambió la resolución de una tele, la encuentra por nombre sin moverle la otra", () => {
+    const a = tv(1512);
+    const b = screen("SAMSUNG|3432,0|1280x720", 3432, { label: "SAMSUNG", width: 1280, height: 720 });
+    const savedB = tv(3432).key;
+    const { outputs, missing, remap } = resolvePlan([laptop, a, b], { selected: [a.key, savedB], mode: "joined" });
+    expect(missing).toBe(0);
+    expect(outputs.map((p) => p.screen.key)).toEqual([a.key, b.key]);
+    expect(remap).toEqual([[savedB, b.key]]);
+  });
+
+  it("nunca toma el monitor del control como tele", () => {
+    const control = screen("SAMSUNG|0,0|1920x1080", 0, { label: "SAMSUNG", isCurrent: true });
+    expect(resolvePlan([control], { selected: [tv(1920).key], mode: "joined" }).missing).toBe(1);
   });
 
   it("cuenta las que faltan (tele apagada)", () => {
