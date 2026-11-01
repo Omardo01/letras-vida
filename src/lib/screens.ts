@@ -135,12 +135,33 @@ export interface PlannedOutput {
 
 /**
  * Qué muestra cada monitor elegido: unidas = cada uno un tramo de la imagen
- * ancha, en el orden en que están acomodados; espejo = la imagen completa en cada uno.
+ * ancha, en el orden de `selected` (el primero es el izquierdo); espejo = la
+ * imagen completa en cada uno.
  */
 export function planOutputs(screens: DetectedScreen[], selected: string[], mode: LaunchMode): PlannedOutput[] {
-  const chosen = screens.filter((s) => selected.includes(s.key)).sort(byPosition);
+  const chosen = selected.map((k) => screens.find((s) => s.key === k)).filter((s): s is DetectedScreen => Boolean(s));
   const of = mode === "joined" ? chosen.length : 1;
   return chosen.map((screen, i) => ({ screen, split: { part: mode === "joined" ? i + 1 : 1, of } }));
+}
+
+/** Los monitores elegidos, en el orden en que están acomodados (al marcar o desmarcar uno). */
+export const inPositionOrder = (screens: DetectedScreen[], keys: string[]) => screens.filter((s) => keys.includes(s.key)).sort(byPosition).map((s) => s.key);
+
+/**
+ * La configuración guardada aplicada a los monitores de ahora. Si un monitor
+ * cambió de identidad (Windows lo reacomodó al apagar y prender la tele), se
+ * busca otro con el mismo nombre y tamaño que no sea el del control.
+ */
+export function resolvePlan(screens: DetectedScreen[], plan: ScreenPlan): { outputs: PlannedOutput[]; missing: number } {
+  const used = new Set<string>();
+  const keys = plan.selected.map((k) => {
+    const [label, , size] = k.split("|");
+    const s = screens.find((x) => x.key === k && !used.has(x.key)) ?? screens.find((x) => !used.has(x.key) && !x.isCurrent && !plan.selected.includes(x.key) && x.label === label && `${x.width}x${x.height}` === size);
+    if (s) used.add(s.key);
+    return s?.key;
+  });
+  const found = keys.filter((k): k is string => Boolean(k));
+  return { outputs: planOutputs(screens, found, plan.mode), missing: keys.length - found.length };
 }
 
 /** Si todos los monitores elegidos tienen la misma proporción, esa; si no, null. */
@@ -150,10 +171,13 @@ export function commonAspect(screens: { width: number; height: number }[]): numb
   return screens.every((s) => Math.abs(s.width / s.height - a) / a < 0.01) ? a : null;
 }
 
-/** Lo que se recuerda para el siguiente servicio: qué monitores y cómo. */
+/** La configuración de pantallas (como en ProPresenter): se hace una vez y se recuerda. */
 export interface ScreenPlan {
+  /** Monitores de salida; en «unidas», en orden de izquierda a derecha. */
   selected: string[];
   mode: LaunchMode;
+  /** Encender las pantallas en cuanto se abre el control. */
+  autoStart?: boolean;
 }
 
 const PLAN_KEY = "letrasvida.live.screen-plan";
@@ -173,6 +197,29 @@ export function saveScreenPlan(plan: ScreenPlan) {
   } catch {
     /* ignore */
   }
+}
+
+/**
+ * Políticas de Chrome para la PC de salida (Windows): dejan a este sitio ver
+ * los monitores, abrir varias ventanas de un clic y ponerlas a pantalla
+ * completa sin tocar cada tele. Es lo que acerca el navegador a ProPresenter.
+ */
+export const CHROME_POLICIES = ["WindowManagementAllowedForUrls", "PopupsAllowedForUrls", "AutomaticFullscreenAllowedForUrls"] as const;
+
+/** Archivo .reg (UTF-16 con BOM, como lo exporta regedit) con las políticas para `origin`. */
+export function chromePolicyReg(origin: string): Blob {
+  const lines = ["Windows Registry Editor Version 5.00", ""];
+  for (const p of CHROME_POLICIES) lines.push(`[HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Google\\Chrome\\${p}]`, `"1"="${origin}"`, "");
+  const text = lines.join("\r\n");
+  const bytes = new Uint8Array(2 + text.length * 2);
+  bytes[0] = 0xff;
+  bytes[1] = 0xfe;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    bytes[2 + i * 2] = c & 0xff;
+    bytes[3 + i * 2] = c >> 8;
+  }
+  return new Blob([bytes], { type: "application/octet-stream" });
 }
 
 /** Selección inicial: la recordada si esos monitores siguen ahí; si no, todos menos el del control. */

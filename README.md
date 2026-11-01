@@ -28,9 +28,8 @@ vivo* en la página principal), para no mezclarlo con la preparación de los
 slides. Muestra las *Citas de hoy* (las pegadas en la página principal) como
 botones de un clic, y la pestaña *Fondos*.
 
-1. En la PC de salida abre `/envivo` y, en **⚙ Pantallas**, pulsa *Abrir
-   salida* (o abre `/live` en otra ventana). Llévala a la pantalla
-   del proyector y pulsa **F** (pantalla completa). También puedes mostrarla
+1. En la PC de salida abre `/envivo` y pulsa **▶ Encender pantallas** (la
+   primera vez, configúralas; ver *Pantallas* abajo). También puedes mostrarla
    dentro de ProPresenter como objeto web (icono HTML del editor) apuntando a
    `https://letrasvida.vercel.app/live` con *Continuous Render* — pero ojo:
    el WebView de ProPresenter es otro navegador, así que para controlarlo hace
@@ -42,16 +41,30 @@ botones de un clic, y la pestaña *Fondos*.
    blanco. Cualquier slide de la lista tiene también un botón *En vivo*.
 3. Cambios de diseño se reflejan en la salida al instante.
 
-### Pantallas unidas, nombres y reposo
+### Pantallas (como en ProPresenter)
 
-*⚙ Pantallas* abre 1, 2 o 3 ventanas de salida que juntas forman una sola
-pantalla ancha (cada una dibuja su tramo de la composición 7680×2160). La
-lista *Ya abiertas* muestra cada ventana con su resolución, un **nombre
-editable** ("LED izquierda"), un selector de tramo y *Identificar* (rótulo
-grande con número y nombre). Cada ventana tiene también un ⚙ propio (abajo a la
-izquierda al mover el ratón) y atajos `1`/`2`/`3`/`U`; recuerda su nombre y
-tramo. *Cuando no hay versículo*: negro, fondo del diseño, logo o logo sobre
-negro.
+Se configuran una vez en **⚙ Configurar pantallas** (Chrome, PC Windows con las
+teles en «Extender estas pantallas»): *Detectar pantallas* muestra el mapa de
+monitores; tocas las teles de salida y eliges **Unidas** (una sola imagen
+ancha, p. ej. dos teles de 65" lado a lado) o **Espejo**. *⇄ Intercambiar*
+corrige si la izquierda quedó a la derecha. La configuración se guarda; si
+Windows reacomoda las teles, las vuelve a encontrar por nombre y tamaño.
+
+Durante el servicio solo se usa **▶ Encender pantallas** / *Apagar*: abre una
+ventana por tele, en su monitor, con su tramo y a pantalla completa. Con
+*Encender al abrir este control* se encienden solas.
+
+Para que no haga falta un clic en cada tele, en la PC de salida se instalan una
+vez las políticas de Chrome `WindowManagementAllowedForUrls`,
+`PopupsAllowedForUrls` y `AutomaticFullscreenAllowedForUrls` para el sitio:
+el panel descarga el `.reg` (doble clic → Sí → `chrome://policy` → *Volver a
+cargar políticas*).
+
+*Ajuste de la unión* (carta de ajuste y *Ajustar* por tele) corrige tamaño y
+posición si una tele sale distinta; *Avanzado* abre ventanas a mano para
+navegadores sin detección de pantallas (cada una con su ⚙ y atajos
+`1`/`2`/`3`/`U`). *Cuando no hay versículo*: negro, fondo del diseño, logo o
+logo sobre negro.
 
 ### Fondos de pantalla
 

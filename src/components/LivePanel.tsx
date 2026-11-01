@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import type { ChapterInfo } from "../lib/bible";
-import { ASPECT_OPTIONS, aspectLabel, DEFAULT_CAL, FIT_OPTIONS, IDLE_OPTIONS, SPLIT_OPTIONS, type Calibration, type IdleMode, type LiveLayout, type OutputInfo, type Split } from "../lib/live";
+import { ASPECT_OPTIONS, aspectLabel, DEFAULT_CAL, FIT_OPTIONS, IDLE_OPTIONS, SPLIT_OPTIONS, splitLabel, type Calibration, type IdleMode, type LiveLayout, type OutputInfo, type Split } from "../lib/live";
 import { BOOK_BY_ID } from "../lib/books";
-import type { PlannedOutput } from "../lib/screens";
+import { commonAspect, resolvePlan, windowManagementState, type PlannedOutput, type ScreenPlan } from "../lib/screens";
 import type { Slide } from "../lib/slides";
-import { ScreensLauncher } from "./ScreensLauncher";
+import { useScreens } from "../hooks/useScreens";
+import { ScreenSetup } from "./ScreenSetup";
 
 interface Props {
   connected: boolean;
@@ -40,6 +41,62 @@ export function LivePanel({ connected, current, resolve, chapterInfo, onShow, on
   const [error, setError] = useState<string | null>(null);
   const [ctx, setCtx] = useState<(ChapterInfo & { bookId: string }) | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const scr = useScreens();
+  const [powerMsg, setPowerMsg] = useState<string | null>(null);
+  const on = Object.values(outputs);
+  const notFull = on.filter((o) => !o.fullscreen).length;
+
+  /**
+   * Enciende las pantallas con la configuración guardada: una ventana por tele,
+   * en su monitor, con su tramo. `auto` = al abrir el control, sin clic (solo
+   * si Chrome ya tiene los permisos; si no, queda esperando el botón).
+   */
+  const powerOn = async (auto = false) => {
+    setPowerMsg(null);
+    const plan = scr.plan;
+    if (!plan?.selected.length) {
+      setConfig(true);
+      setPowerMsg("Primero elige qué pantallas son de salida.");
+      return;
+    }
+    if (auto && (await windowManagementState()) !== "granted") return;
+    const list = await scr.current();
+    if (!list) {
+      setConfig(true);
+      setPowerMsg("Chrome no dio permiso para ver los monitores.");
+      return;
+    }
+    const { outputs: planned, missing } = resolvePlan(list, plan);
+    if (missing || !planned.length) {
+      setConfig(true);
+      setPowerMsg(`No encuentro ${missing > 1 ? `${missing} de las pantallas configuradas` : "una de las pantallas configuradas"}. Revisa que las teles estén prendidas y que Windows las tenga en «Extender», o vuelve a elegirlas.`);
+      return;
+    }
+    const aspect = plan.mode === "joined" && planned.length > 1 ? commonAspect(planned.map((p) => p.screen)) : null;
+    if (aspect && Math.abs(aspect - layout.aspect) > 0.001) onLayout({ ...layout, aspect });
+    const blocked = onLaunch(planned);
+    if (blocked) {
+      setPowerMsg(
+        auto
+          ? "Chrome no dejó encender las pantallas solo; pulsa «Encender pantallas»."
+          : `Chrome bloqueó ${blocked === planned.length ? "las ventanas" : `${blocked} de ${planned.length} ventanas`}. Haz clic en el ícono de ventanas emergentes bloqueadas (barra de dirección) → «Permitir siempre» y vuelve a encender, o instala los permisos en ⚙ Configurar.`,
+      );
+    }
+  };
+  // Un aviso de «Encender» deja de valer en cuanto se toca la configuración.
+  useEffect(() => setPowerMsg(null), [scr.plan]);
+  const powerRef = useRef(powerOn);
+  powerRef.current = powerOn;
+  const outputsRef = useRef(outputs);
+  outputsRef.current = outputs;
+
+  // «Encender al abrir»: espera a ver si ya hay salidas vivas (control recargado) para no reabrirlas.
+  useEffect(() => {
+    if (!scr.plan?.autoStart) return;
+    const t = window.setTimeout(() => !Object.keys(outputsRef.current).length && powerRef.current(true), 1500);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const showAt = (i: number, q = queue) => {
     if (!q[i]) return;
@@ -134,40 +191,70 @@ export function LivePanel({ connected, current, resolve, chapterInfo, onShow, on
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className={clsx("inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-semibold", connected ? "border-good/40 bg-green-50 text-good" : "border-warn/40 bg-amber-50 text-warn")}>
-          <span className={clsx("h-1.5 w-1.5 rounded-full", connected ? "bg-good" : "bg-warn")} />
-          {connected ? "Pantalla de salida conectada" : "Sin pantalla de salida"}
-        </span>
-        <button onClick={() => setConfig((v) => !v)} className={clsx("rounded-lg border px-2.5 py-1 font-semibold", config ? "border-accent bg-blue-50 text-accent" : "border-line hover:border-accent/60")}>
-          ⚙ Pantallas
-        </button>
-        {!connected && !config && (
-          <button onClick={() => setConfig(true)} className="rounded-lg bg-accent px-2.5 py-1 font-semibold text-white hover:brightness-110">
-            Lanzar en pantallas
+      <div className="space-y-1.5">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {on.length ? (
+            <>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-good/40 bg-green-50 px-2.5 py-1 font-semibold text-good">
+                <span className="h-2 w-2 rounded-full bg-good" />
+                Pantallas encendidas
+              </span>
+              <button onClick={() => powerOn()} className="rounded-lg border border-line px-2.5 py-1 font-semibold hover:border-accent/60" title="Vuelve a abrirlas con la configuración guardada (p. ej. después de cambiarla)">
+                Reabrir
+              </button>
+              <button onClick={onCloseOutputs} className="rounded-lg border border-line px-2.5 py-1 font-semibold hover:border-bad/50 hover:text-bad">
+                Apagar
+              </button>
+            </>
+          ) : (
+            <button onClick={() => powerOn()} className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-bold text-white hover:brightness-110">
+              ▶ Encender pantallas
+            </button>
+          )}
+          <span className="text-muted">{planSummary(scr.plan)}</span>
+          <button onClick={() => setConfig((v) => !v)} className={clsx("ml-auto rounded-lg border px-2.5 py-1 font-semibold", config ? "border-accent bg-blue-50 text-accent" : "border-line hover:border-accent/60")}>
+            ⚙ Configurar pantallas
           </button>
+        </div>
+        {on.length > 0 && (
+          <ul className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
+            {on
+              .sort((a, b) => a.part - b.part || a.id.localeCompare(b.id))
+              .map((o) => (
+                <li key={o.id} className="flex items-center gap-1.5 text-muted">
+                  <span className={clsx("h-2 w-2 shrink-0 rounded-full", o.fullscreen ? "bg-good" : "bg-warn")} />
+                  <b className="text-ink">{o.name || splitLabel(o)}</b>
+                  {o.monitor && <span>· {o.monitor}</span>}
+                  <span>· {o.fullscreen ? "pantalla completa" : "falta un clic en esa tele"}</span>
+                </li>
+              ))}
+          </ul>
         )}
+        {notFull > 0 && !scr.autoFs && (
+          <p className="text-[11px] text-warn">Para no tener que hacer clic en cada tele, instala los permisos de Chrome en ⚙ Configurar pantallas.</p>
+        )}
+        {powerMsg && <p className="text-xs text-bad">{powerMsg}</p>}
       </div>
 
       {config && (
-        <div className="space-y-2 rounded-xl border border-line bg-bg/60 p-3 text-sm">
-          <ScreensLauncher outputs={outputs} layout={layout} onLayout={onLayout} onLaunch={onLaunch} onClose={onCloseOutputs} onIdentify={() => onIdentify()} />
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted" title="Ventanas sueltas que llevas tú a cada monitor (para navegadores sin detección de pantallas)">Abrir a mano:</span>
-            <button onClick={() => onOpenOutput(1)} className="rounded-lg border border-line bg-panel px-2.5 py-1 text-xs font-semibold hover:border-accent/60">1 pantalla</button>
-            <button onClick={() => onOpenOutput(2)} className="rounded-lg border border-line bg-panel px-2.5 py-1 text-xs font-semibold hover:border-accent/60" title="Dos ventanas: izquierda y derecha, una en cada monitor">2 pantallas unidas</button>
-            <button onClick={() => onOpenOutput(3)} className="rounded-lg border border-line bg-panel px-2.5 py-1 text-xs font-semibold hover:border-accent/60">3 pantallas unidas</button>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted">Ya abiertas ({Object.keys(outputs).length}):</span>
-            <button onClick={() => onIdentify()} disabled={!connected} className="rounded-lg bg-accent px-2.5 py-1 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-40" title="Cada ventana muestra su número y lado en grande">
-              Identificar todas
-            </button>
-            <button onClick={onSwap} disabled={!connected} className="rounded-lg border border-line bg-panel px-2.5 py-1 text-xs font-semibold hover:border-accent/60 disabled:opacity-40" title="Si la izquierda quedó en el monitor derecho">
-              Intercambiar izquierda ↔ derecha
-            </button>
-          </div>
+        <div className="space-y-3 rounded-xl border border-line bg-bg/60 p-3 text-sm">
+          <ScreenSetup scr={scr} onIdentify={() => onIdentify()} />
           <div className="flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-xs text-muted">Cuando no hay versículo:</span>
+            {IDLE_OPTIONS.map((o) => (
+              <button
+                key={o.mode}
+                onClick={() => onIdle(o.mode)}
+                title={o.hint}
+                className={clsx("rounded-lg border px-2.5 py-1 text-xs font-semibold", idle === o.mode ? "border-accent bg-accent text-white" : "border-line bg-panel hover:border-accent/60")}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <details open={on.length > 0} className="space-y-2">
+            <summary className="cursor-pointer text-xs font-semibold">Ajuste de la unión entre las teles</summary>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <span className="mr-1 text-xs text-muted" title="La misma para todas las pantallas unidas: así el versículo mide igual en cada una y cruza la unión sin escalón">Proporción de cada pantalla unida:</span>
             {ASPECT_OPTIONS.map((o) => (
               <button
@@ -231,20 +318,25 @@ export function LivePanel({ connected, current, resolve, chapterInfo, onShow, on
                 ))}
             </ul>
           )}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-xs text-muted">Cuando no hay versículo:</span>
-            {IDLE_OPTIONS.map((o) => (
-              <button
-                key={o.mode}
-                onClick={() => onIdle(o.mode)}
-                title={o.hint}
-                className={clsx("rounded-lg border px-2.5 py-1 text-xs font-semibold", idle === o.mode ? "border-accent bg-accent text-white" : "border-line bg-panel hover:border-accent/60")}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-muted">Si una pantalla sale más grande, más chica o desfasada (p. ej. por un adaptador DP), muestra la <b>carta de ajuste</b> y usa <b>Ajustar</b> en esa salida hasta que los círculos queden redondos y las líneas sigan rectas en la unión. Si abriste las ventanas a mano, lleva cada una a su monitor y pulsa <b>F</b>. Cada ventana tiene también un ⚙ abajo a la izquierda (mueve el ratón) para ponerle nombre y elegir su mitad; atajos 1 / 2 / U.</p>
+          <p className="mt-2 text-xs text-muted">Si una tele sale más grande, más chica o desfasada, muestra la <b>carta de ajuste</b> y usa <b>Ajustar</b> en esa salida hasta que los círculos queden redondos y las líneas sigan rectas en la unión. El ajuste se guarda con esa tele.</p>
+          </details>
+          <details className="text-xs">
+            <summary className="cursor-pointer font-semibold">Avanzado: abrir ventanas a mano</summary>
+            <div className="mt-2 space-y-2">
+              <p className="text-muted">Para navegadores que no detectan pantallas: abre las ventanas, arrastra cada una a su tele y pulsa <b>F</b>. Cada ventana tiene un ⚙ abajo a la izquierda (mueve el ratón) para elegir su mitad; atajos 1 / 2 / U.</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button onClick={() => onOpenOutput(1)} className="rounded-lg border border-line bg-panel px-2.5 py-1 font-semibold hover:border-accent/60">1 pantalla</button>
+                <button onClick={() => onOpenOutput(2)} className="rounded-lg border border-line bg-panel px-2.5 py-1 font-semibold hover:border-accent/60" title="Dos ventanas: izquierda y derecha, una en cada monitor">2 pantallas unidas</button>
+                <button onClick={() => onOpenOutput(3)} className="rounded-lg border border-line bg-panel px-2.5 py-1 font-semibold hover:border-accent/60">3 pantallas unidas</button>
+                <button onClick={() => onIdentify()} disabled={!connected} className="rounded-lg border border-line bg-panel px-2.5 py-1 font-semibold hover:border-accent/60 disabled:opacity-40" title="Cada ventana muestra su número y lado en grande">
+                  Identificar todas
+                </button>
+                <button onClick={onSwap} disabled={!connected} className="rounded-lg border border-line bg-panel px-2.5 py-1 font-semibold hover:border-accent/60 disabled:opacity-40" title="Si la izquierda quedó en el monitor derecho">
+                  Intercambiar izquierda ↔ derecha
+                </button>
+              </div>
+            </div>
+          </details>
         </div>
       )}
 
@@ -326,7 +418,15 @@ export function LivePanel({ connected, current, resolve, chapterInfo, onShow, on
   );
 }
 
-const isTuned = (cal?: Calibration) => Boolean(cal) && (Object.keys(DEFAULT_CAL) as (keyof Calibration)[]).some((k) => cal![k] !== DEFAULT_CAL[k]);
+/** «2 teles unidas en una imagen», «2 pantallas en espejo»… lo que hará «Encender». */
+function planSummary(plan: ScreenPlan | null): string {
+  const n = plan?.selected.length ?? 0;
+  if (!n) return "Sin configurar";
+  if (n === 1) return "1 pantalla";
+  return plan!.mode === "joined" ? `${n} teles unidas en una sola imagen` : `${n} pantallas en espejo`;
+}
+
+const isTuned =(cal?: Calibration) => Boolean(cal) && (Object.keys(DEFAULT_CAL) as (keyof Calibration)[]).some((k) => cal![k] !== DEFAULT_CAL[k]);
 
 const pct = (v: number) => `${(v * 100).toFixed(1).replace(/\.0$/, "")} %`;
 const signedPct = (v: number) => `${v > 0 ? "+" : ""}${(v * 100).toFixed(1).replace(/\.0$/, "")} %`;
