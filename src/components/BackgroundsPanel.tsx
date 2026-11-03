@@ -7,6 +7,25 @@ interface Props {
   onSelect: (bg: { id: string; kind: "video" | "image" } | null) => void;
 }
 
+/**
+ * Miniatura que solo se reproduce con el mouse encima: son videos 4K y esta
+ * PC también mueve las salidas, así que no los decodificamos todos a la vez.
+ */
+function HoverVideo({ src }: { src: string }) {
+  return (
+    <video
+      src={`${src}#t=2`}
+      muted
+      loop
+      playsInline
+      preload="metadata"
+      onMouseEnter={(e) => void e.currentTarget.play().catch(() => {})}
+      onMouseLeave={(e) => e.currentTarget.pause()}
+      className="aspect-video w-full object-cover"
+    />
+  );
+}
+
 /** Fondos en movimiento para la pantalla de salida (video o imagen, guardados en este navegador). */
 export function BackgroundsPanel({ active, onSelect }: Props) {
   const [items, setItems] = useState<Background[]>([]);
@@ -91,7 +110,7 @@ export function BackgroundsPanel({ active, onSelect }: Props) {
           return (
             <li key={bg.id} className={clsx("overflow-hidden rounded-xl border", isActive ? "border-accent ring-2 ring-accent/30" : "border-line")}>
               <button onClick={() => onSelect({ id: bg.id, kind: bg.kind })} className="block w-full bg-black" title="Usar este fondo">
-                <video src={bg.url} muted loop playsInline autoPlay preload="metadata" className="aspect-video w-full object-cover" />
+                <HoverVideo src={bg.url} />
               </button>
               <div className="flex items-center justify-between gap-2 px-2 py-1.5 text-xs">
                 <span className="min-w-0 truncate font-semibold">{isActive ? "● " : ""}{bg.name}</span>
@@ -112,7 +131,7 @@ export function BackgroundsPanel({ active, onSelect }: Props) {
                 <button onClick={() => onSelect({ id: bg.id, kind: bg.kind })} className="block w-full bg-black" title="Usar este fondo">
                   {urls[bg.id] ? (
                     bg.kind === "video" ? (
-                      <video src={urls[bg.id]} muted loop playsInline autoPlay className="aspect-video w-full object-cover" />
+                      <HoverVideo src={urls[bg.id]} />
                     ) : (
                       <img src={urls[bg.id]} alt="" className="aspect-video w-full object-cover" />
                     )

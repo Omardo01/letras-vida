@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import type { ChapterInfo } from "../lib/bible";
-import { ASPECT_OPTIONS, aspectLabel, DEFAULT_CAL, FIT_OPTIONS, IDLE_OPTIONS, SPLIT_OPTIONS, splitLabel, type Calibration, type IdleMode, type LiveLayout, type OutputInfo, type Split } from "../lib/live";
+import { ASPECT_OPTIONS, aspectLabel, DEFAULT_CAL, FIT_OPTIONS, SPLIT_OPTIONS, splitLabel, type Calibration, type LiveLayout, type OutputInfo, type Split } from "../lib/live";
 import { BOOK_BY_ID } from "../lib/books";
 import { commonAspect, resolvePlan, windowManagementState, type PlannedOutput, type ScreenPlan } from "../lib/screens";
 import type { Slide } from "../lib/slides";
@@ -24,14 +24,12 @@ interface Props {
   onAssign: (id: string, split: Split) => void;
   onRename: (id: string, name: string) => void;
   outputs: Record<string, OutputInfo>;
-  idle: IdleMode;
-  onIdle: (mode: IdleMode) => void;
   layout: LiveLayout;
   onLayout: (layout: LiveLayout) => void;
   onCalibrate: (id: string, cal: Calibration) => void;
 }
 
-export function LivePanel({ connected, current, resolve, chapterInfo, onShow, onClear, onOpenOutput, onLaunch, onCloseOutputs, onIdentify, onSwap, onAssign, onRename, outputs, idle, onIdle, layout, onLayout, onCalibrate }: Props) {
+export function LivePanel({ connected, current, resolve, chapterInfo, onShow, onClear, onOpenOutput, onLaunch, onCloseOutputs, onIdentify, onSwap, onAssign, onRename, outputs, layout, onLayout, onCalibrate }: Props) {
   const [config, setConfig] = useState(false);
   const [tuning, setTuning] = useState<string | null>(null);
   const [text, setText] = useState("");
@@ -239,19 +237,6 @@ export function LivePanel({ connected, current, resolve, chapterInfo, onShow, on
       {config && (
         <div className="space-y-3 rounded-xl border border-line bg-bg/60 p-3 text-sm">
           <ScreenSetup scr={scr} onIdentify={() => onIdentify()} />
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-xs text-muted">Cuando no hay versículo:</span>
-            {IDLE_OPTIONS.map((o) => (
-              <button
-                key={o.mode}
-                onClick={() => onIdle(o.mode)}
-                title={o.hint}
-                className={clsx("rounded-lg border px-2.5 py-1 text-xs font-semibold", idle === o.mode ? "border-accent bg-accent text-white" : "border-line bg-panel hover:border-accent/60")}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
           <details open={on.length > 0} className="space-y-2">
             <summary className="cursor-pointer text-xs font-semibold">Ajuste de la unión entre las teles</summary>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -410,10 +395,6 @@ export function LivePanel({ connected, current, resolve, chapterInfo, onShow, on
           </div>
         </div>
       )}
-
-      <p className="text-xs text-muted">
-        En pantalla ahora: {current ? <b>{current.label || current.text.slice(0, 40)}</b> : <span>nada (en blanco)</span>}
-      </p>
     </div>
   );
 }

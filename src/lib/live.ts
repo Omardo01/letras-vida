@@ -2,13 +2,14 @@ import type { Design } from "./design";
 import type { Slide } from "./slides";
 
 /** Qué muestra la salida cuando no hay versículo. */
-export type IdleMode = "black" | "background" | "logo" | "logo-black";
+export type IdleMode = "black" | "background" | "logo" | "logo-anim" | "logo-black";
 
 export const IDLE_OPTIONS: { mode: IdleMode; label: string; hint: string }[] = [
+  { mode: "background", label: "Solo fondo", hint: "El fondo en movimiento (o el color de fondo del diseño), sin texto" },
+  { mode: "logo", label: "Logo", hint: "El logo en el centro de cada tele, sobre el fondo" },
+  { mode: "logo-anim", label: "Logo animado", hint: "El logo entra, queda respirando y de vez en cuando lo cruza un brillo" },
+  { mode: "logo-black", label: "Logo sobre negro", hint: "El logo en el centro de cada tele, sobre negro" },
   { mode: "black", label: "Negro", hint: "Pantalla completamente negra" },
-  { mode: "background", label: "Fondo", hint: "Solo el color de fondo del diseño" },
-  { mode: "logo", label: "Logo", hint: "Logo centrado sobre el fondo del diseño" },
-  { mode: "logo-black", label: "Logo sobre negro", hint: "Logo centrado sobre negro" },
 ];
 
 /** Lo que la pantalla de salida necesita para dibujar (o quedar en reposo). */

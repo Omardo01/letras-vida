@@ -6,10 +6,18 @@ export const IN_SECONDS = 0.55;
 export const OUT_SECONDS = 0.45;
 
 // ── Geometría fija (unidades de referencia) ──
-/** Borde superior de la caja: justo debajo del logo y la píldora. */
-export const BOX_TOP = 142;
+/** Borde superior de la caja: justo debajo de la franja del logo y la píldora. */
+export const BOX_TOP = 122;
 /** Margen interior mínimo a los lados del texto. */
 export const BOX_PAD = 70;
+/** Franja de arriba: centro vertical del logo y la píldora. */
+const HEADER_MID = 62;
+const LOGO_H = 84;
+const PILL_H = 70;
+/** Distancia mínima de logo y píldora al borde de la pantalla. */
+const EDGE = 24;
+/** Interlineado (× tamaño de letra): más apretado que el de un párrafo para que quepan letras grandes. */
+const LINE_HEIGHT = 1.3;
 
 export interface AnimState {
   /** Segundos desde el inicio del clip. */
@@ -129,7 +137,7 @@ export function fitText(
     const fontSize = size * S;
     ctx.font = `700 ${fontSize}px "${design.fontFamily}", sans-serif`;
     const lines = wrap(ctx, text, innerW);
-    const lineHeight = fontSize * 1.45;
+    const lineHeight = fontSize * LINE_HEIGHT;
     const fits = lines.length * lineHeight <= innerH && lines.every((l) => ctx.measureText(l).width <= innerW);
     return { fontSize, lines, lineHeight, fits };
   };
@@ -140,6 +148,28 @@ export function fitText(
   ctx.font = `700 ${result.fontSize}px "${design.fontFamily}", sans-serif`;
   const lines = result.lines.length > 1 && !text.includes("\n") ? balancedWrap(ctx, text, innerW, result.lines.length) : result.lines;
   return { fontSize: result.fontSize, lines, lineHeight: result.lineHeight };
+}
+
+function rgb(color: string): number[] | null {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color);
+  if (!m) return null;
+  const hex = m[1].length === 3 ? m[1].replace(/./g, "$&$&") : m[1];
+  return [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+}
+
+/** Aclara (amount > 0) u oscurece (amount < 0) un color #rgb/#rrggbb; otro formato se devuelve igual. */
+function shade(color: string, amount: number): string {
+  const ch = rgb(color);
+  if (!ch) return color;
+  const target = amount > 0 ? 255 : 0;
+  const a = Math.abs(amount);
+  return `rgb(${ch.map((c) => Math.round(c * (1 - a) + target * a)).join(",")})`;
+}
+
+/** Luminosidad aproximada 0–1 (0.4 si el color no es hex). */
+function luminance(color: string): number {
+  const ch = rgb(color);
+  return ch ? (0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]) / 255 : 0.4;
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -168,6 +198,8 @@ export function drawSlide(
 ) {
   const S = W / REF_W;
   const offY = (H - REF_H * S) / 2; // centra el diseño si la pantalla no es 3.55:1
+  // Las sombras no siguen la transformación del canvas: se escalan a mano (la salida en vivo dibuja ya escalada por dpr).
+  const px = Math.hypot(ctx.getTransform().c, ctx.getTransform().d) || 1;
   const t = anim?.t ?? 10;
   const o = anim ? Math.max(0, t - anim.outStart) : 0;
 
@@ -186,29 +218,45 @@ export function drawSlide(
     ctx.fillRect(0, 0, W, H);
   }
 
+  // La caja manda: logo y píldora se alinean con sus bordes (sin pegarse a la orilla de la pantalla).
+  const bw = design.boxWidth * S;
+  const bh = design.boxHeight * S;
+  const bx = (W - bw) / 2;
+  const by = offY + BOX_TOP * S;
+  const left = Math.max(bx, EDGE * S);
+  const right = Math.min(bx + bw, W - EDGE * S);
+
   // Logo
   if (design.showLogo && logo) {
-    const w = 186 * S * design.logoScale;
-    const h = (w * logo.naturalHeight) / logo.naturalWidth;
+    const h = LOGO_H * S * design.logoScale;
+    const w = (h * logo.naturalWidth) / logo.naturalHeight;
     ctx.globalAlpha = logoIn * logoOut;
-    ctx.drawImage(logo, 12 * S + (1 - logoIn) * -30 * S, offY + 10 * S, w, h);
+    ctx.drawImage(logo, left + (1 - logoIn) * -30 * S, offY + HEADER_MID * S - h / 2, w, h);
     ctx.globalAlpha = 1;
   }
 
-  // Píldora
+  // Píldora: a la derecha queda entera en la tele derecha; al centro la cruzaría la unión.
   if (slide.label) {
-    const ph = 70 * S;
+    const ph = PILL_H * S;
     const scale = 0.9 + 0.1 * pillDrop;
     const dy = (-90 * (1 - pillDrop) - 70 * (1 - pillOut)) * S;
     ctx.save();
-    ctx.globalAlpha = clamp01(pillDrop * 1.6) * pillOut;
-    ctx.translate(W / 2, offY + 34 * S + ph / 2 + dy);
-    ctx.scale(scale, scale);
     ctx.font = `700 ${design.pillFontSize * S}px "${design.fontFamily}", sans-serif`;
-    const width = Math.max(520 * S, ctx.measureText(slide.label).width + 96 * S);
-    ctx.fillStyle = design.pillColor;
+    const centered = design.pillAlign === "center";
+    const width = Math.max((centered ? 520 : 300) * S, ctx.measureText(slide.label).width + 96 * S);
+    ctx.globalAlpha = clamp01(pillDrop * 1.6) * pillOut;
+    ctx.translate(centered ? W / 2 : right - width / 2, offY + HEADER_MID * S + dy);
+    ctx.scale(scale, scale);
+    ctx.shadowColor = "rgba(6, 40, 70, 0.22)";
+    ctx.shadowBlur = 14 * S * px;
+    ctx.shadowOffsetY = 4 * S * px;
+    const pg = ctx.createLinearGradient(0, -ph / 2, 0, ph / 2);
+    pg.addColorStop(0, shade(design.pillColor, 0.12));
+    pg.addColorStop(1, design.pillColor);
+    ctx.fillStyle = pg;
     roundRect(ctx, -width / 2, -ph / 2, width, ph, ph / 2);
     ctx.fill();
+    ctx.shadowColor = "transparent";
     ctx.fillStyle = design.pillTextColor;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -216,18 +264,48 @@ export function drawSlide(
     ctx.restore();
   }
 
-  // Caja
-  const bw = design.boxWidth * S;
-  const bh = design.boxHeight * S;
-  const bx = (W - bw) / 2;
-  const by = offY + BOX_TOP * S;
+  // Caja: degradado vertical (nunca de lado a lado, que parecería una tele más clara que la otra) y sombra suave.
   ctx.save();
   ctx.globalAlpha = boxIn * boxOut;
   ctx.translate(bx, by);
   ctx.scale(1, 0.55 + 0.45 * boxIn * (0.6 + 0.4 * boxOut));
-  ctx.fillStyle = design.boxColor;
-  roundRect(ctx, 0, 0, bw, bh, design.boxRadius * S);
+  const radius = design.boxRadius * S;
+  ctx.save();
+  ctx.shadowColor = "rgba(6, 40, 70, 0.28)";
+  ctx.shadowBlur = 36 * S * px;
+  ctx.shadowOffsetY = 10 * S * px;
+  // Una caja clara apenas se oscurece abajo (si no, se ve gris); en una oscura el brillo casi no se pone (se vería lavada).
+  const lum = luminance(design.boxColor);
+  const bg = ctx.createLinearGradient(0, 0, 0, bh);
+  bg.addColorStop(0, shade(design.boxColor, 0.1));
+  bg.addColorStop(1, shade(design.boxColor, lum > 0.75 ? -0.04 : -0.14));
+  ctx.fillStyle = bg;
+  roundRect(ctx, 0, 0, bw, bh, radius);
   ctx.fill();
+  ctx.restore();
+  // Brillo al centro de la caja, simétrico respecto a la unión.
+  ctx.save();
+  roundRect(ctx, 0, 0, bw, bh, radius);
+  ctx.clip();
+  ctx.translate(bw / 2, bh * 0.2);
+  ctx.scale(bw / bh, 1);
+  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, bh * 0.75);
+  glow.addColorStop(0, `rgba(255,255,255,${0.14 * Math.min(1, Math.max(0.25, (lum - 0.1) / 0.3))})`);
+  glow.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(-bh, -bh, 2 * bh, 2 * bh);
+  ctx.restore();
+  // Filo de luz arriba.
+  ctx.save();
+  roundRect(ctx, 0, 0, bw, bh, radius);
+  ctx.clip();
+  const rim = ctx.createLinearGradient(0, 0, 0, radius + 24 * S);
+  rim.addColorStop(0, "rgba(255,255,255,0.3)");
+  rim.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.strokeStyle = rim;
+  ctx.lineWidth = 4 * S;
+  ctx.stroke();
+  ctx.restore();
 
   // Texto
   const pad = BOX_PAD * S;
@@ -245,6 +323,12 @@ export function drawSlide(
   ctx.fillStyle = design.textColor;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
+  // Sombra solo bajo texto claro; bajo texto oscuro sería un halo borroso.
+  if (luminance(design.textColor) > 0.5) {
+    ctx.shadowColor = "rgba(0, 20, 45, 0.3)";
+    ctx.shadowBlur = 10 * S * px;
+    ctx.shadowOffsetY = 3 * S * px;
+  }
   const startY = bh / 2 - ((lines.length - 1) * lineHeight) / 2;
   lines.forEach((line, i) => {
     const lineIn = anim ? easeOutCubic((t - 0.28 - i * 0.06) / 0.34) : 1;
@@ -262,6 +346,66 @@ export function renderPng(slide: Slide, design: Design, logo: HTMLImageElement |
   const ctx = canvas.getContext("2d")!;
   drawSlide(ctx, W, H, design, slide, logo);
   return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob falló"))), "image/png"));
+}
+
+let sheenCanvas: HTMLCanvasElement | null = null;
+
+/**
+ * Logo de reposo centrado en (cx, cy) con alto `h`. Con `t` (segundos desde
+ * que apareció) entra con un rebote suave, queda respirando con un halo del
+ * color de la píldora y cada 5 s lo cruza un brillo; sin `t`, quieto.
+ */
+export function drawLogo(ctx: CanvasRenderingContext2D, logo: HTMLImageElement, cx: number, cy: number, h: number, design: Design, t?: number) {
+  const w = (h * logo.naturalWidth) / logo.naturalHeight;
+  if (t == null) {
+    ctx.drawImage(logo, cx - w / 2, cy - h / 2, w, h);
+    return;
+  }
+  const enter = easeOutCubic(t / 0.9);
+  const settled = clamp01((t - 0.8) / 1.5); // la respiración arranca poco a poco al terminar la entrada
+  const breathe = Math.sin((2 * Math.PI * t) / 6) * settled;
+  const scale = (0.8 + 0.2 * spring(t * 0.85)) * (1 + 0.03 * breathe);
+  const y = cy + (1 - enter) * h * 0.14 - Math.sin((2 * Math.PI * t) / 8) * settled * h * 0.025;
+  const dw = w * scale;
+  const dh = h * scale;
+
+  ctx.save();
+  ctx.globalAlpha = enter;
+  const ch = rgb(design.pillColor) ?? [3, 172, 219];
+  const halo = ctx.createRadialGradient(cx, y, 0, cx, y, dh * 1.15);
+  halo.addColorStop(0, `rgba(${ch.join(",")},${0.3 + 0.08 * breathe})`);
+  halo.addColorStop(1, `rgba(${ch.join(",")},0)`);
+  ctx.fillStyle = halo;
+  ctx.fillRect(cx - dh * 1.2, y - dh * 1.2, dh * 2.4, dh * 2.4);
+
+  // Brillo: una franja diagonal recortada a la forma del logo (lienzo aparte, al tamaño real en píxeles).
+  const s = ((t - 1.4) % 5) / 1.3;
+  if (t < 1.4 || s > 1) {
+    ctx.drawImage(logo, cx - dw / 2, y - dh / 2, dw, dh);
+  } else {
+    const m = ctx.getTransform();
+    const ow = Math.max(1, Math.ceil(dw * Math.hypot(m.a, m.b)));
+    const oh = Math.max(1, Math.ceil(dh * Math.hypot(m.c, m.d)));
+    sheenCanvas ??= document.createElement("canvas");
+    if (sheenCanvas.width !== ow || sheenCanvas.height !== oh) {
+      sheenCanvas.width = ow;
+      sheenCanvas.height = oh;
+    }
+    const o = sheenCanvas.getContext("2d")!;
+    o.clearRect(0, 0, ow, oh);
+    o.globalCompositeOperation = "source-over";
+    o.drawImage(logo, 0, 0, ow, oh);
+    o.globalCompositeOperation = "source-atop";
+    const x = (-0.5 + 2 * s) * ow;
+    const band = o.createLinearGradient(x, 0, x + ow * 0.45, oh);
+    band.addColorStop(0, "rgba(255,255,255,0)");
+    band.addColorStop(0.5, "rgba(255,255,255,0.75)");
+    band.addColorStop(1, "rgba(255,255,255,0)");
+    o.fillStyle = band;
+    o.fillRect(0, 0, ow, oh);
+    ctx.drawImage(sheenCanvas, cx - dw / 2, y - dh / 2, dw, dh);
+  }
+  ctx.restore();
 }
 
 const PATTERN_COLORS = ["#22d3ee", "#fbbf24", "#f472b6", "#a3e635"];

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ensureFont, loadDesign, normalizeDesign, type Design } from "./lib/design";
 import { loadCalibration, loadLayout, loadOutputName, loadSplit, LocalLive, monitorLabel, outputId, saveCalibration, saveOutputName, saveSplit, SPLIT_OPTIONS, splitLabel, targetFromUrl, tramoAspect, tramoRect, type Calibration, type IdleMode, type LiveLayout, type LiveState, type OutputInfo, type Split } from "./lib/live";
-import { drawPattern, drawSlide, IN_SECONDS, loadLogo, OUT_SECONDS } from "./lib/render";
+import { drawLogo, drawPattern, drawSlide, IN_SECONDS, loadLogo, OUT_SECONDS } from "./lib/render";
 import type { Slide } from "./lib/slides";
 import { builtinUrl, getBackgroundBlob } from "./lib/backgrounds";
 import { findScreen } from "./lib/screens";
@@ -149,10 +149,10 @@ export function LivePage() {
           ctx.fillRect(0, 0, W, H);
         }
         const logo = logoRef.current;
-        if ((idle === "logo" || idle === "logo-black") && logo) {
-          const h = Math.min(H * 0.42, (W * 0.18 * logo.naturalHeight) / logo.naturalWidth);
-          const w = (h * logo.naturalWidth) / logo.naturalHeight;
-          ctx.drawImage(logo, (W - w) / 2, (H - h) / 2, w, h);
+        if ((idle === "logo" || idle === "logo-anim" || idle === "logo-black") && logo) {
+          // Un logo por tele: al centro de la composición lo partiría la unión.
+          const h = Math.min(H * 0.42, (tw * 0.4 * logo.naturalHeight) / logo.naturalWidth);
+          for (let i = 0; i < of; i++) drawLogo(ctx, logo, (i + 0.5) * tw, H / 2, h, design, idle === "logo-anim" ? (t ?? 10) : undefined);
         }
       } else {
         const d = hasMedia ? { ...design, background: "transparent" } : design;
@@ -221,6 +221,14 @@ export function LivePage() {
       if (next) {
         await run(next, IN_SECONDS + 0.3, (t) => paint(next, design, t));
         if (current.current.slide === next) paint(next, design);
+      } else if (idle === "logo-anim") {
+        // Sin fin: lo corta stopAnim() en cuanto llega otra cosa.
+        const start = performance.now();
+        const tick = () => {
+          paint(null, design, (performance.now() - start) / 1000);
+          anim.current.raf = requestAnimationFrame(tick);
+        };
+        tick();
       } else {
         paint(null, design);
       }

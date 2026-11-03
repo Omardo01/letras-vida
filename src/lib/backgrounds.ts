@@ -69,13 +69,28 @@ export interface BuiltinBackground {
   name: string;
   kind: "video";
   url: string;
+  /** Cuadro fijo chiquito (32:9) para elegirlo sin decodificar el video. */
+  poster: string;
   size: number;
 }
 
+const builtin = (file: string, name: string, size: number): BuiltinBackground => ({
+  id: `builtin:${file}`,
+  name,
+  kind: "video",
+  url: `${import.meta.env.BASE_URL}backgrounds/${file}.mp4`,
+  poster: `${import.meta.env.BASE_URL}backgrounds/posters/${file}.jpg`,
+  size,
+});
+
 export const BUILTIN_BACKGROUNDS: BuiltinBackground[] = [
-  { id: "builtin:aurora", name: "Aurora azul", kind: "video", url: `${import.meta.env.BASE_URL}backgrounds/aurora.mp4`, size: 3105508 },
-  { id: "builtin:bokeh", name: "Bokeh", kind: "video", url: `${import.meta.env.BASE_URL}backgrounds/bokeh.mp4`, size: 4264308 },
-  { id: "builtin:estrellas", name: "Estrellas", kind: "video", url: `${import.meta.env.BASE_URL}backgrounds/estrellas.mp4`, size: 2431301 },
+  builtin("aurora", "Aurora azul", 3105508),
+  builtin("bokeh", "Bokeh", 4264308),
+  builtin("estrellas", "Estrellas", 2431301),
+  builtin("ondas", "Ondas", 9897121),
+  builtin("rayos", "Rayos de luz", 4281321),
+  builtin("cielo", "Cielo", 4753411),
+  builtin("geometrico", "Geométrico", 11402025),
 ];
 
 export const builtinUrl = (id: string) => BUILTIN_BACKGROUNDS.find((b) => b.id === id)?.url ?? null;

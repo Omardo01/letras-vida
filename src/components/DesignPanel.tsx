@@ -102,13 +102,33 @@ export function DesignPanel({ design, onChange }: Props) {
         </select>
       </label>
 
-      <Range label="Tamaño máximo del texto" value={design.maxFontSize} min={24} max={72} onChange={(v) => set({ maxFontSize: v, minFontSize: Math.min(design.minFontSize, v) })} />
+      <Range label="Tamaño máximo del texto" value={design.maxFontSize} min={24} max={90} onChange={(v) => set({ maxFontSize: v, minFontSize: Math.min(design.minFontSize, v) })} />
       <Range label="Tamaño mínimo (pasajes largos)" value={design.minFontSize} min={14} max={design.maxFontSize} onChange={(v) => set({ minFontSize: v })} />
       <Range label="Tamaño de los títulos" value={design.titleFontSize} min={30} max={130} onChange={(v) => set({ titleFontSize: v })} />
       <Range label="Tamaño de la cita" value={design.pillFontSize} min={20} max={48} onChange={(v) => set({ pillFontSize: v })} />
+      <div className="text-sm">
+        <span>Posición de la cita</span>
+        <div className="mt-1 grid grid-cols-2 gap-2">
+          {(
+            [
+              { value: "right", label: "Derecha", hint: "Con dos teles unidas, la unión no parte la cita" },
+              { value: "center", label: "Centro", hint: "Para una sola pantalla" },
+            ] as const
+          ).map((o) => (
+            <button
+              key={o.value}
+              onClick={() => set({ pillAlign: o.value })}
+              title={o.hint}
+              className={clsx("rounded-lg border px-2 py-1.5 text-xs font-semibold", design.pillAlign === o.value ? "border-accent bg-accent text-white" : "border-line bg-panel hover:border-accent/60")}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <Range label="Ancho de la caja" value={design.boxWidth} min={1200} max={1960} step={10} onChange={(v) => set({ boxWidth: v })} />
       <Range label="Ancho del bloque de texto" value={design.textMaxWidth} min={700} max={design.boxWidth - 2 * BOX_PAD} step={10} onChange={(v) => set({ textMaxWidth: v })} />
-      <Range label="Alto de la caja" value={design.boxHeight} min={200} max={REF_H - BOX_TOP - 12} step={2} onChange={(v) => set({ boxHeight: v })} />
+      <Range label="Alto de la caja" value={design.boxHeight} min={200} max={REF_H - BOX_TOP - 12} step={1} onChange={(v) => set({ boxHeight: v })} />
       <Range label="Redondeo de la caja" value={design.boxRadius} min={0} max={80} onChange={(v) => set({ boxRadius: v })} />
 
       <div className="space-y-2 rounded-lg border border-line p-3">

@@ -37,9 +37,15 @@ botones de un clic, y la pestaña *Fondos*.
 2. Teclea la cita y Enter: aparece con la animación de entrada. `←`/`→`
    avanzan versículo a versículo (aunque te salgas de lo tecleado), los
    botones numerados saltan a cualquier versículo del capítulo, `‹ cap.` /
-   `cap. ›` cambian de capítulo y **Esc** o *Limpiar* deja la pantalla en
-   blanco. Cualquier slide de la lista tiene también un botón *En vivo*.
-3. Cambios de diseño se reflejan en la salida al instante.
+   `cap. ›` cambian de capítulo y **Esc** o *Limpiar* quita el versículo.
+   Cualquier slide de la lista tiene también un botón *En vivo*.
+3. La barra fija de arriba (*En pantalla*) dice qué hay en las teles y, con
+   un clic, quita el versículo y deja **Solo fondo**, **Logo**, **Logo
+   animado** (entra, respira y lo cruza un brillo), **Logo sobre negro** o
+   **Negro**; lo último elegido es también lo que sale al limpiar. Debajo se
+   cambia el fondo en movimiento sin ir a la pestaña *Fondos*. Con teles
+   unidas el logo va al centro de cada tele, no partido por la unión.
+4. Cambios de diseño se reflejan en la salida al instante.
 
 ### Pantallas (como en ProPresenter)
 
@@ -63,16 +69,17 @@ cargar políticas*).
 *Ajuste de la unión* (carta de ajuste y *Ajustar* por tele) corrige tamaño y
 posición si una tele sale distinta; *Avanzado* abre ventanas a mano para
 navegadores sin detección de pantallas (cada una con su ⚙ y atajos
-`1`/`2`/`3`/`U`). *Cuando no hay versículo*: negro, fondo del diseño, logo o
-logo sobre negro.
+`1`/`2`/`3`/`U`).
 
 ### Fondos de pantalla
 
-Pestaña *Fondos* de `/envivo`. Vienen tres incluidos (Aurora azul, Bokeh,
-Estrellas — `public/backgrounds/`, generados con Remotion en
-`tecnolutions/animaciones/remotion-intro/src/Fondos.tsx`, bucle perfecto de
-20 s a 1920×540) y puedes subir los tuyos (se guardan en IndexedDB del
-navegador de la PC de salida). Eliges uno y las ventanas lo
+Pestaña *Fondos* de `/envivo`. Vienen siete incluidos (Aurora azul, Bokeh,
+Estrellas, Ondas, Rayos de luz, Cielo y Geométrico — `public/backgrounds/`,
+generados con Remotion en
+`tecnolutions/animaciones/remotion-intro/src/Fondos.tsx` con
+`npm run render:fondos [-- nombre…]`, bucle perfecto de 20 s a 3840×1080) y
+puedes subir los tuyos (se guardan en IndexedDB del navegador de la PC de
+salida). Las miniaturas se reproducen al pasar el mouse. Eliges uno y las ventanas lo
 reproducen en bucle detrás del versículo, partido entre las pantallas y
 arrancando en el mismo punto. Con fondo activo el diseño se dibuja con fondo
 transparente. Recomendado: MP4 H.264 ≤ 100 MB.
@@ -87,6 +94,12 @@ previsto pero no incluido.
 El panel *Diseño* cambia colores, fuente, tamaños, logo y fondo (blanco o
 transparente). Se guarda en el navegador. *Restablecer diseño original* vuelve
 al look de referencia (píldora `#03acdb`, caja `#1178bc`, Open Sans Bold).
+
+Las medidas están pensadas para dos teles 16:9 unidas (32:9): márgenes
+parejos, la cita arriba a la derecha para que la unión de las teles no la
+parta (*Posición de la cita → Centro* para una sola pantalla) y nada que
+cambie de izquierda a derecha en la caja, para que una tele no parezca más
+clara que la otra.
 
 ## Desarrollo
 

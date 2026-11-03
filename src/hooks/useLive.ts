@@ -41,13 +41,13 @@ export function useLive(design: Design) {
     [publish],
   );
 
-  /** Cambia el reposo; si la pantalla está vacía, se ve al instante. */
-  const setIdle = useCallback(
+  /** Quita el versículo (si hay) y deja en pantalla el reposo elegido; también es lo que saldrá al limpiar. */
+  const showIdle = useCallback(
     (mode: IdleMode) => {
       idleRef.current = mode;
       setIdleState(mode);
       saveIdle(mode);
-      if (!currentRef.current) publish(null);
+      publish(null);
     },
     [publish],
   );
@@ -130,5 +130,5 @@ export function useLive(design: Design) {
     live.current?.send({ type: "layout", layout: next });
   }, []);
 
-  return { layout, setLayout, calibrate, current, connected, outputs, idle, setIdle, background, setBackground, show: publish, clear: () => publish(null), openOutput, launch, closeOutputs, identify, swap, assign, rename };
+  return { layout, setLayout, calibrate, current, connected, outputs, idle, showIdle, background, setBackground, show: publish, clear: () => publish(null), openOutput, launch, closeOutputs, identify, swap, assign, rename };
 }

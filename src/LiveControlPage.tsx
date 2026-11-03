@@ -8,6 +8,7 @@ import { buildSlides, type Slide } from "./lib/slides";
 import { useLive } from "./hooks/useLive";
 import { LivePanel } from "./components/LivePanel";
 import { BackgroundsPanel } from "./components/BackgroundsPanel";
+import { ScreenBar } from "./components/ScreenBar";
 
 /**
  * /envivo — ventana de control para el servicio: cita rápida, pantallas
@@ -76,6 +77,8 @@ export function LiveControlPage() {
         </div>
       </header>
 
+      <ScreenBar current={live.current} idle={live.idle} onIdle={live.showIdle} background={live.background} onBackground={live.setBackground} refreshKey={tab} />
+
       {tab === "citas" ? (
         <div className="space-y-4">
           <section className="rounded-2xl border-2 border-accent-2/40 bg-panel p-4">
@@ -94,8 +97,6 @@ export function LiveControlPage() {
               onAssign={live.assign}
               onRename={live.rename}
               outputs={live.outputs}
-              idle={live.idle}
-              onIdle={live.setIdle}
               layout={live.layout}
               onLayout={live.setLayout}
               onCalibrate={live.calibrate}

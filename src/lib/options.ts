@@ -22,9 +22,12 @@ export interface Options {
 export const OPTS_KEY = "versiculos.options.v1";
 export const TEXT_KEY = "versiculos.text.v1";
 
+/** v2: la caja para dos teles aguanta más texto; el máximo de letras que venía por defecto (220) sube con ella. */
+const OPTS_VERSION = 2;
+
 export const DEFAULT_OPTS: Options = {
   versions: ["RVR1960"],
-  maxChars: 220,
+  maxChars: 320,
   verseNumbers: true,
   pngSize: 0,
   pngCustom: { w: 7680, h: 2160 },
@@ -38,7 +41,12 @@ export const DEFAULT_OPTS: Options = {
 export function loadOptions(): Options {
   try {
     const raw = localStorage.getItem(OPTS_KEY);
-    if (raw) return { ...DEFAULT_OPTS, ...(JSON.parse(raw) as Partial<Options>) };
+    if (raw) {
+      const saved = JSON.parse(raw) as Partial<Options> & { v?: number };
+      const opts = { ...DEFAULT_OPTS, ...saved };
+      if (saved.v !== OPTS_VERSION && saved.maxChars === 220) opts.maxChars = DEFAULT_OPTS.maxChars;
+      return opts;
+    }
   } catch {
     /* sin localStorage */
   }
@@ -47,7 +55,7 @@ export function loadOptions(): Options {
 
 export function saveOptions(opts: Options) {
   try {
-    localStorage.setItem(OPTS_KEY, JSON.stringify(opts));
+    localStorage.setItem(OPTS_KEY, JSON.stringify({ ...opts, v: OPTS_VERSION }));
   } catch {
     /* ignore */
   }

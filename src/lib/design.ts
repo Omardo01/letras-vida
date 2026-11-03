@@ -20,6 +20,8 @@ export interface Design {
   logo: string | null; // dataURL o ruta
   showLogo: boolean;
   logoScale: number;
+  /** Dónde va la píldora: a la derecha (no la parte la unión de dos teles) o al centro. */
+  pillAlign: "right" | "center";
   /** Versión de las medidas por defecto con que se guardó (ver LAYOUT_VERSION). */
   layoutVersion: number;
 }
@@ -31,8 +33,9 @@ export const REF_H = 563;
  * Sube cuando cambian las medidas por defecto. Un diseño guardado con otra
  * versión conserva colores, fuente y logo, pero toma las medidas nuevas.
  * v3: caja y texto más grandes que la referencia original (v2 fue un paso intermedio).
+ * v4: pensado para dos teles 16:9 unidas (32:9): márgenes parejos, caja, bloque de texto y letras más grandes.
  */
-export const LAYOUT_VERSION = 3;
+export const LAYOUT_VERSION = 4;
 const LAYOUT_KEYS = ["maxFontSize", "minFontSize", "titleFontSize", "pillFontSize", "boxHeight", "boxWidth", "textMaxWidth"] as const;
 
 export const DEFAULT_DESIGN: Design = {
@@ -42,17 +45,18 @@ export const DEFAULT_DESIGN: Design = {
   boxColor: "#1178bc",
   textColor: "#ffffff",
   fontFamily: "Open Sans",
-  maxFontSize: 48,
-  minFontSize: 26,
-  titleFontSize: 78,
-  pillFontSize: 38,
+  maxFontSize: 64,
+  minFontSize: 30,
+  titleFontSize: 96,
+  pillFontSize: 40,
   boxRadius: 22,
-  boxHeight: 388,
-  boxWidth: 1860,
-  textMaxWidth: 1560,
+  boxHeight: 411,
+  boxWidth: 1940,
+  textMaxWidth: 1700,
   logo: `${import.meta.env.BASE_URL}logo.png`,
   showLogo: true,
   logoScale: 1,
+  pillAlign: "right",
   layoutVersion: LAYOUT_VERSION,
 };
 

@@ -26,7 +26,8 @@ export default defineConfig({
           {
             urlPattern: ({ url }) => url.pathname.startsWith("/backgrounds/"),
             handler: "CacheFirst",
-            options: { cacheName: "backgrounds", expiration: { maxEntries: 12 }, rangeRequests: true },
+            // 7 videos incluidos + sus miniaturas: que una miniatura nunca saque del caché a un video.
+            options: { cacheName: "backgrounds", expiration: { maxEntries: 40 }, rangeRequests: true },
           },
         ],
       },
